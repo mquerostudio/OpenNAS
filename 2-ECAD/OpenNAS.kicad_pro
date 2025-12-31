@@ -412,6 +412,38 @@
     [
       "c3e8415d-ccbf-4045-9c3c-11e0edd6b083",
       "Root"
+    ],
+    [
+      "ef8cf217-acb6-4f51-b85d-5979b9b73c13",
+      "Power"
+    ],
+    [
+      "82337fe5-028b-44ad-ac62-1489ae676ebb",
+      "MCU"
+    ],
+    [
+      "b513c53d-70c3-4c55-a3bb-7836e28a98ea",
+      "HDD1"
+    ],
+    [
+      "7920279e-cf13-4731-9d31-6d34f5801831",
+      "HDD2"
+    ],
+    [
+      "d36baafe-8db8-4fe8-8196-fff00d1c0abe",
+      "HDD3"
+    ],
+    [
+      "6bfeb963-358a-4c19-bcca-26e4b69f1f9d",
+      "HDD4"
+    ],
+    [
+      "fcfab167-6aff-4f4f-a514-234bd1b60cad",
+      "HDD5"
+    ],
+    [
+      "9d610a51-fbfd-4d61-a4ae-3f69cca72c7d",
+      "HDD6"
     ]
   ],
   "text_variables": {}
