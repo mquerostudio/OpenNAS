@@ -126,6 +126,20 @@
     font-size: .85rem;
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   }
+  .authbar { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+  .authbar input {
+    flex: 1; min-width: 160px; font: .85rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    color: var(--text); background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: .45rem .6rem;
+  }
+  .hint { font-size: .8rem; }
+  .hint.ok { color: var(--green); }
+  .hint.bad { color: var(--red); }
+  .banner {
+    background: rgba(248,81,73,.12); border: 1px solid var(--red); color: var(--red);
+    border-radius: 8px; padding: .6rem .9rem; margin-bottom: 1rem;
+    font-weight: 600; font-size: .9rem;
+  }
 </style>
 </head>
 <body>
@@ -139,6 +153,14 @@
     <span id="heap"></span>
   </div>
 </header>
+
+<div class="authbar">
+  <input type="password" id="token" placeholder="API token (Bearer)" autocomplete="off"
+    oninput="saveToken()">
+  <span id="authMsg" class="hint"></span>
+</div>
+
+<div id="failsafeBanner" class="banner" hidden></div>
 
 <h2>Ventiladores</h2>
 <div id="fans" class="grid">Cargando…</div>
@@ -159,12 +181,45 @@
   <div id="otaMsg"></div>
 </div>
 
+<h2>Token de API</h2>
+<div class="card ota-section">
+  <div class="ota-row">
+    <input type="text" id="newToken" placeholder="Nuevo token (se guarda en el dispositivo, NVS)">
+    <button class="btn-accent" onclick="provisionToken()">Fijar en el dispositivo</button>
+  </div>
+  <div id="tokMsg" class="hint"></div>
+</div>
+
 <footer>
   <button onclick="resetWifi()">Borrar credenciales WiFi</button>
 </footer>
 
 <script>
   const $ = (id) => document.getElementById(id);
+
+  /* ---- API token (Bearer) ---- */
+  const TOKEN_KEY = 'opennas_token';
+  const getToken = () => localStorage.getItem(TOKEN_KEY) || '';
+  function saveToken() {
+    localStorage.setItem(TOKEN_KEY, $('token').value);
+    setAuthMsg('', '');
+  }
+  function authHeaders(extra) {
+    const t = getToken();
+    return Object.assign(t ? { 'Authorization': 'Bearer ' + t } : {}, extra || {});
+  }
+  function setAuthMsg(text, cls) {
+    const el = $('authMsg'); el.textContent = text; el.className = 'hint ' + (cls || '');
+  }
+  /* Wrapper: warns in the auth bar on 401. Returns the Response (or null on network error). */
+  async function apiPost(path, opts) {
+    try {
+      const r = await fetch(path, opts);
+      if (r.status === 401) setAuthMsg('token incorrecto o ausente', 'bad');
+      else if (r.ok) setAuthMsg('', '');
+      return r;
+    } catch (e) { return null; }
+  }
 
   const fmtUptime = (s) => {
     const d = Math.floor(s / 86400), h = Math.floor(s / 3600) % 24,
@@ -189,21 +244,36 @@
   };
 
   async function setFan(id, duty) {
-    try {
-      await fetch(`/api/fan/${id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duty })
-      });
-    } catch (e) { /* ignore */ }
+    await apiPost(`/api/fan/${id}`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ duty })
+    });
   }
 
   async function resetWifi() {
     if (!confirm('Esto borrará las credenciales WiFi y reiniciará en modo AP. ¿Continuar?')) return;
-    try {
-      await fetch('/api/reset_wifi', { method: 'POST' });
-    } catch (e) { /* ignore */ }
+    const r = await apiPost('/api/reset_wifi', { method: 'POST', headers: authHeaders() });
+    if (r && r.status === 401) return;   // bad token, keep the page
     document.body.innerHTML = '<p style="padding:2rem;text-align:center;font-family:sans-serif">Reiniciando…</p>';
+  }
+
+  async function provisionToken() {
+    const t = $('newToken').value.trim();
+    if (!t) { alert('Escribe un token'); return; }
+    const msg = $('tokMsg');
+    msg.textContent = 'Fijando…'; msg.className = 'hint';
+    const r = await apiPost('/api/set_token', {
+      method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ token: t })
+    });
+    if (!r) { msg.textContent = 'Error de conexión'; msg.className = 'hint bad'; return; }
+    if (r.status === 401) { msg.textContent = 'El token actual (campo de arriba) es incorrecto'; msg.className = 'hint bad'; return; }
+    if (!r.ok) { msg.textContent = 'Error ' + r.status; msg.className = 'hint bad'; return; }
+    // success: the new token is now the active one — store it so further POSTs work
+    localStorage.setItem(TOKEN_KEY, t);
+    $('token').value = t; $('newToken').value = '';
+    msg.textContent = 'Token fijado en el dispositivo y guardado en este navegador ✓'; msg.className = 'hint ok';
   }
 
   function renderFans(fans) {
@@ -270,6 +340,16 @@
       $('heap').textContent = d.free_heap != null ? `heap ${fmtBytes(d.free_heap)}` : '';
       renderFans(d.fans);
       renderHdds(d.hdds);
+      const banner = $('failsafeBanner');
+      if (d.failsafe) {
+        const since = (d.ms_since_cmd >= 4294967295)
+          ? 'sin comando desde el arranque'
+          : `último comando hace ${fmtAgo(d.ms_since_cmd)}`;
+        banner.textContent = `⚠ FAILSAFE — ventiladores forzados al 100% · ${since}`;
+        banner.hidden = false;
+      } else {
+        banner.hidden = true;
+      }
     } catch (e) {
       const st = $('status');
       st.textContent = 'offline'; st.className = 'offline';
@@ -336,6 +416,8 @@
     };
 
     xhr.open('POST', '/api/ota');
+    const tk = getToken();
+    if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
     xhr.send(file);
   }
 
@@ -367,6 +449,7 @@
   /* ---- Start polling ---- */
 
   let pollTimer;
+  $('token').value = getToken();
   poll();
   pollTimer = setInterval(poll, 1500);
 </script>

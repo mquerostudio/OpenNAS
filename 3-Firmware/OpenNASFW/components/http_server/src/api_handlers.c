@@ -23,23 +23,42 @@ static const char *TAG = "http_api";
  * Effective token: NVS opennas/auth_token if present, else CONFIG_OPENNAS_AUTH_TOKEN.
  * Enforced on POST endpoints only; GET /api/status stays open. */
 
+static char s_token[64];
+static bool s_token_loaded = false;
+
 static const char *effective_token(void)
 {
-    static char tok[64];
-    static bool loaded = false;
-    if (loaded) return tok;
+    if (s_token_loaded) return s_token;
     nvs_handle_t h;
-    size_t len = sizeof(tok);
+    size_t len = sizeof(s_token);
     if (nvs_open("opennas", NVS_READONLY, &h) == ESP_OK) {
-        if (nvs_get_str(h, "auth_token", tok, &len) != ESP_OK) {
-            snprintf(tok, sizeof(tok), "%s", CONFIG_OPENNAS_AUTH_TOKEN);
+        if (nvs_get_str(h, "auth_token", s_token, &len) != ESP_OK) {
+            snprintf(s_token, sizeof(s_token), "%s", CONFIG_OPENNAS_AUTH_TOKEN);
         }
         nvs_close(h);
     } else {
-        snprintf(tok, sizeof(tok), "%s", CONFIG_OPENNAS_AUTH_TOKEN);
+        snprintf(s_token, sizeof(s_token), "%s", CONFIG_OPENNAS_AUTH_TOKEN);
     }
-    loaded = true;
-    return tok;
+    s_token_loaded = true;
+    return s_token;
+}
+
+/* Persist a new API token to NVS and refresh the in-RAM cache (takes effect now,
+ * no reboot; WiFi creds and other NVS keys are preserved). */
+static esp_err_t set_token(const char *tok)
+{
+    size_t n = strlen(tok);
+    if (n == 0 || n >= sizeof(s_token)) return ESP_ERR_INVALID_ARG;
+    nvs_handle_t h;
+    esp_err_t err = nvs_open("opennas", NVS_READWRITE, &h);
+    if (err != ESP_OK) return err;
+    err = nvs_set_str(h, "auth_token", tok);
+    if (err == ESP_OK) err = nvs_commit(h);
+    nvs_close(h);
+    if (err != ESP_OK) return err;
+    snprintf(s_token, sizeof(s_token), "%s", tok);
+    s_token_loaded = true;
+    return ESP_OK;
 }
 
 /* Constant-time compare (avoids a timing oracle on the token). */
@@ -178,6 +197,28 @@ static long json_get_int(const char *body, const char *key)
     return -1;
 }
 
+/* Extract `"key":"value"` into out (NUL-terminated). Returns true if found.
+ * No escape handling — fine for tokens (hex/alphanumeric). */
+static bool json_get_str(const char *body, const char *key, char *out, size_t outlen)
+{
+    size_t kl = strlen(key);
+    for (const char *p = body; (p = strchr(p, '"')) != NULL;) {
+        p++;
+        if (strncmp(p, key, kl) != 0 || p[kl] != '"') continue;
+        p = strchr(p + kl + 1, ':');
+        if (!p) return false;
+        p++;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p != '"') return false;
+        p++;
+        size_t i = 0;
+        while (*p && *p != '"' && i + 1 < outlen) out[i++] = *p++;
+        out[i] = '\0';
+        return true;
+    }
+    return false;
+}
+
 static esp_err_t h_fan_post(httpd_req_t *req)
 {
     if (!http_auth_ok(req)) {
@@ -235,6 +276,47 @@ static esp_err_t h_fan_post(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* ---------------- POST /api/set_token ----------------
+ * Body {"token":"<new>"}. Authed with the CURRENT token. Persists the new API
+ * token to NVS and applies it immediately (keeps WiFi creds). */
+
+static esp_err_t h_set_token_post(httpd_req_t *req)
+{
+    if (!http_auth_ok(req)) {
+        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "missing/invalid token");
+        return ESP_FAIL;
+    }
+
+    char body[160];
+    int received = 0;
+    while (received < (int)sizeof(body) - 1) {
+        int r = httpd_req_recv(req, body + received, sizeof(body) - 1 - received);
+        if (r <= 0) {
+            if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            break;
+        }
+        received += r;
+    }
+    body[received] = '\0';
+
+    char newtok[64];
+    if (!json_get_str(body, "token", newtok, sizeof(newtok))) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing \"token\"");
+        return ESP_FAIL;
+    }
+
+    esp_err_t err = set_token(newtok);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+
+    ESP_LOGW(TAG, "API token updated via /api/set_token");
+    httpd_resp_set_status(req, "204 No Content");
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
 /* ---------------- POST /api/reset_wifi ---------------- */
 
 static esp_err_t h_reset_wifi_post(httpd_req_t *req)
@@ -276,10 +358,14 @@ esp_err_t http_server_register_api(httpd_handle_t handle)
     static const httpd_uri_t u_reset = {
         .uri = "/api/reset_wifi", .method = HTTP_POST, .handler = h_reset_wifi_post,
     };
+    static const httpd_uri_t u_set_token = {
+        .uri = "/api/set_token", .method = HTTP_POST, .handler = h_set_token_post,
+    };
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_root));
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_favicon));
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_status));
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_fan));
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_reset));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_set_token));
     return ESP_OK;
 }
