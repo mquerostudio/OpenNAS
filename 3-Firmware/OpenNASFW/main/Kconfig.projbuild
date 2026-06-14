@@ -1,0 +1,24 @@
+menu "OpenNAS"
+
+config OPENNAS_FAILSAFE_DUTY
+    int "Failsafe fan duty (%)"
+    range 0 100
+    default 100
+    help
+        Duty al que vuelven ambos ventiladores si no llega comando en el timeout.
+
+config OPENNAS_FAILSAFE_TIMEOUT_S
+    int "Failsafe timeout (s)"
+    range 5 600
+    default 60
+    help
+        Segundos sin POST /api/fan antes de que el watchdog fuerce el failsafe.
+
+config OPENNAS_AUTH_TOKEN
+    string "API auth token (placeholder; el real va por NVS)"
+    default "changeme"
+    help
+        Valor por defecto del token Bearer para los POST. NUNCA pongas el token real
+        aqui (sdkconfig se commitea). El real se inyecta en NVS (ver plan, Task 6).
+
+endmenu
