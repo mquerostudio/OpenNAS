@@ -1,53 +1,131 @@
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-H21 | ESP32-H4 | ESP32-P4 | ESP32-S2 | ESP32-S3 | Linux |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | --------- | -------- | --------- | -------- | -------- | -------- | -------- | ----- |
+# OpenNAS Firmware (ESP32-C5)
 
-# OpenNASFW
+Firmware del controlador de la PCB OpenNAS: controla **2 ventiladores** (PWM + tacómetro), lee la
+**actividad de 6 HDD** (pines ACT vía un expansor I2C TCA9554) y expone todo por una **API HTTP**.
 
-Starts a FreeRTOS task to print "Hello World".
+## Arquitectura: el ESP es un esclavo
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+La **lógica de la curva de ventiladores NO vive aquí**. La temperatura de los discos se lee en el
+servidor (lab01/cockpit, vía la API de Proxmox SMART), así que el **cerebro** —decidir el duty de los
+ventiladores según la temperatura— vive en el cockpit. El ESP32 es un **esclavo**:
 
-## How to use example
-
-Follow detailed instructions provided specifically for this example.
-
-Select the instructions depending on Espressif chip installed on your development board:
-
-- [ESP32 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/stable/get-started/index.html)
-- [ESP32-S2 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/get-started/index.html)
-
-
-## Example folder contents
-
-The project **OpenNASFW** contains one source file in C language [OpenNASFW_main.c](main/OpenNASFW_main.c). The file is located in folder [main](main).
-
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt` files that provide set of directives and instructions describing the project's source files and targets (executable, library, or both).
-
-Below is short explanation of remaining files in the project folder.
+- **Expone recursos** (`GET /api/status`): rpm/duty de ventiladores + actividad de cada HDD.
+- **Acepta comandos** (`POST /api/fan`): el cerebro le dice a qué duty poner cada ventilador.
+- **Se autoprotege** (failsafe): si el cerebro calla, sube los ventiladores al 100% solo.
 
 ```
-├── CMakeLists.txt
-├── pytest_OpenNASFW.py        Python script used for automated testing
-├── main
-│   ├── CMakeLists.txt
-│   └── OpenNASFW_main.c
-└── README.md                  This is the file you are currently reading
+[cockpit lab01]  --GET /api/status-->  [ESP32-C5]   (lee fans + hdds + failsafe)
+[cockpit]        --POST /api/fan {duty} + Bearer-->  [ESP32-C5]   (aplica duty, refresca watchdog)
+   (si el cockpit calla > 60 s)         [watchdog]  --> ventiladores al 100%, failsafe=true
 ```
 
-For more information on structure and contents of ESP-IDF projects, please refer to Section [Build System](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/build-system.html) of the ESP-IDF Programming Guide.
+Diseño y decisiones: [`../../docs/superpowers/specs/2026-06-08-opennas-fw-failsafe-auth-design.md`](../../docs/superpowers/specs/2026-06-08-opennas-fw-failsafe-auth-design.md).
 
-## Troubleshooting
+## Componentes (`components/`)
 
-* Program upload failure
+| Componente | Qué hace |
+|---|---|
+| `board` | Init de placa (I2C, pines). Ver `board_pins.h`. |
+| `fan_control` | 2 ventiladores: PWM LEDC 25 kHz + tacómetro PCNT. **Watchdog failsafe** + duty solo en RAM. |
+| `hdd_monitor` | 6 HDD: lee los pines ACT vía TCA9554 (I2C) a 50 Hz; `active` / `last_active` / `event_count`. |
+| `net_manager` | WiFi: modo **AP** (provisioning) o **STA** (conectado al router). Credenciales en NVS. |
+| `provisioning` | Portal cautivo (DNS hijack) en modo AP para meter las credenciales WiFi. |
+| `http_server` | Servidor httpd :80 + API REST (`api_handlers.c`) + **auth Bearer compartida** (`http_auth_ok`). |
+| `ota_manager` | Actualización de firmware por OTA (`POST /api/ota`) + guardia de rollback. |
+| `main` | Orquesta el arranque: board → fan → hdd → ota → http_server → (en STA) registra API + OTA. |
 
-    * Hardware connection is not correct: run `idf.py -p PORT monitor`, and reboot your board to see if there are any output logs.
-    * The baud rate for downloading is too high: lower your baud rate in the `menuconfig` menu, and try again.
+## API HTTP
 
-## Technical support and feedback
+Base: `http://<ip-del-esp>/`. La IP se ve en `GET /api/status` y en el log de arranque.
 
-Please use the following feedback channels:
+| Método | Endpoint | Auth | Cuerpo / efecto |
+|---|---|---|---|
+| GET | `/` | — | Dashboard HTML embebido. |
+| GET | `/api/status` | **abierto** | Estado completo (JSON, ver abajo). |
+| POST | `/api/fan/{0,1}` | **Bearer** | `{"duty":0..100}` → 204. Aplica el duty y refresca el watchdog. |
+| POST | `/api/reset_wifi` | **Bearer** | Borra credenciales WiFi y reinicia a modo AP. |
+| POST | `/api/ota` | **Bearer** | Sube una imagen de firmware (binario) y reinicia a ella. |
 
-* For technical queries, go to the [esp32.com](https://esp32.com/) forum
-* For a feature request or bug report, create a [GitHub issue](https://github.com/espressif/esp-idf/issues)
+### `GET /api/status` (esquema)
 
-We will get back to you as soon as possible.
+```json
+{
+  "fans": [ { "id": 0, "duty": 40, "rpm": 900 }, { "id": 1, "duty": 40, "rpm": 880 } ],
+  "hdds": [ { "id": 1, "active": false, "last_ms": 1297, "events": 2239 } ],
+  "uptime_s": 1234,
+  "free_heap": 210000,
+  "failsafe": false,
+  "ms_since_cmd": 4200,
+  "version": "...",
+  "build_date": "...",
+  "ip": "192.168.1.153"
+}
+```
+
+- `failsafe` (bool): true si el watchdog ha forzado el modo seguro (sin comando reciente).
+- `ms_since_cmd`: milisegundos desde el último `POST /api/fan` (UINT32_MAX si nunca hubo).
+
+### Autenticación
+
+Los **POST** exigen `Authorization: Bearer <token>`. `GET /api/status` queda abierto (solo lectura).
+Un solo token gobierna todos los endpoints de escritura (fan, reset_wifi, ota) — `http_auth_ok` en
+`http_server.h` es la única puerta de auth.
+
+**Token efectivo:** NVS `opennas/auth_token` si existe; si no, `CONFIG_OPENNAS_AUTH_TOKEN` (Kconfig).
+Comparación en tiempo constante; fail-closed si el token está vacío.
+
+```bash
+curl -X POST http://192.168.1.153/api/fan/0 -H "Authorization: Bearer <TOKEN>" -d '{"duty":40}'
+```
+
+### Failsafe (watchdog de ventiladores)
+
+- Al arrancar: ambos ventiladores a `CONFIG_OPENNAS_FAILSAFE_DUTY` (100%), `failsafe=true`, hasta el
+  primer comando.
+- Si pasan `CONFIG_OPENNAS_FAILSAFE_TIMEOUT_S` (60 s) sin `POST /api/fan`, el watchdog fuerza ambos
+  ventiladores al duty seguro. Sale del failsafe con el siguiente comando.
+- `set_duty` **no persiste en NVS** (el cockpit es la fuente de verdad; evita desgaste de flash).
+
+## Configuración (`menuconfig` → menú "OpenNAS")
+
+| Símbolo | Default | Qué |
+|---|---|---|
+| `OPENNAS_FAILSAFE_DUTY` | `100` | Duty seguro (%) al que van los ventiladores en failsafe. |
+| `OPENNAS_FAILSAFE_TIMEOUT_S` | `60` | Segundos sin comando antes de disparar el failsafe. |
+| `OPENNAS_AUTH_TOKEN` | `"changeme"` | **Placeholder** del token Bearer. El real va por NVS (ver abajo). |
+
+## Build & flash (ESP-IDF v6.0.1)
+
+El entorno se activa con el script de EIM (no `export.sh`):
+
+```bash
+cd 3-Firmware/OpenNASFW
+source "$HOME/.espressif/tools/activate_idf_v6.0.1.sh"
+export IDF_PYTHON_ENV_PATH="$HOME/.espressif/tools/python/v6.0.1/venv"
+
+idf.py build
+idf.py -p <PUERTO> flash monitor    # primer flasheo por USB
+```
+
+Actualizaciones posteriores: por **OTA** (`POST /api/ota` con la imagen `build/OpenNASFW.bin` + token).
+Alternativa: el `.devcontainer/` (imagen `espressif/idf`).
+
+### Provisionar el token real (fuera de Git)
+
+El default `changeme` es un placeholder. El token real se inyecta en NVS (namespace `opennas`, clave
+`auth_token`) **sin commitearlo**:
+
+```bash
+TOK=$(openssl rand -hex 24)            # guárdalo: también va al .env del cockpit (OPENNAS_TOKEN)
+printf 'key,type,encoding,value\nopennas,namespace,,\nauth_token,data,string,%s\n' "$TOK" > /tmp/nvs.csv
+python "$IDF_PATH/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py" generate \
+  /tmp/nvs.csv /tmp/nvs.bin 0x6000   # tamaño de la partición nvs en partitions.csv
+esptool.py -p <PUERTO> write_flash <offset_nvs> /tmp/nvs.bin
+rm /tmp/nvs.csv /tmp/nvs.bin
+```
+
+## Provisioning WiFi
+
+Sin credenciales, arranca en modo **AP** con SSID `OpenNAS-setup-<xx>` (abierto). Conéctate y el portal
+cautivo (`192.168.4.1`) pide SSID/clave. Se guardan en NVS y reinicia a modo **STA**.
+`POST /api/reset_wifi` (con token) las borra y vuelve a AP.

@@ -63,7 +63,9 @@ bool http_auth_ok(httpd_req_t *req)
     if (strncmp(p, "Bearer ", 7) != 0) return false;
     p += 7;
     while (*p == ' ') p++;
-    return ct_equal(p, effective_token());
+    const char *tok = effective_token();
+    if (tok[0] == '\0') return false;   /* fail-closed if the token is unset */
+    return ct_equal(p, tok);
 }
 
 /* Embedded dashboard (see CMakeLists.txt EMBED_TXTFILES). */
