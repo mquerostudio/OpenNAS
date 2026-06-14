@@ -6,161 +6,80 @@
 <meta name="color-scheme" content="dark">
 <title>OpenNAS</title>
 <style>
-  :root {
-    --bg: #0d1117;
-    --card: #161b22;
-    --card-hover: #1c2128;
-    --border: #30363d;
-    --text: #c9d1d9;
-    --muted: #8b949e;
-    --accent: #58a6ff;
-    --green: #3fb950;
-    --amber: #d29922;
-    --red: #f85149;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
-  body {
-    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: var(--bg); color: var(--text);
-    padding: 1.25rem; max-width: 960px; margin: 0 auto;
-  }
-  header {
-    display: flex; justify-content: space-between; align-items: baseline;
-    border-bottom: 1px solid var(--border); padding-bottom: .75rem;
-    margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap;
-  }
-  h1 { margin: 0; font-size: 1.4rem; font-weight: 600; letter-spacing: -.01em; }
-  h2 {
-    font-size: .78rem; color: var(--muted); text-transform: uppercase;
-    letter-spacing: .1em; margin: 1.5rem 0 .6rem; font-weight: 600;
-  }
-  .meta {
-    color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: .82rem; display: flex; gap: 1rem; flex-wrap: wrap;
-  }
-  .meta .offline { color: var(--red); }
-  .meta .online { color: var(--green); }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: .75rem;
-  }
-  .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 10px; padding: .9rem 1rem;
-  }
-  .fan .row1 { display: flex; justify-content: space-between; align-items: baseline; }
-  .fan .title { font-weight: 600; font-size: .95rem; }
-  .fan .duty {
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    color: var(--accent); font-weight: 600;
-  }
-  .fan input[type=range] {
-    width: 100%; accent-color: var(--accent);
-    margin: .75rem 0 .5rem; display: block;
-  }
-  .fan .rpm {
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 1.6rem; font-weight: 600; line-height: 1;
-  }
-  .fan .rpm-unit { color: var(--muted); font-size: .8rem; margin-left: .25rem; }
-  .hdd { display: flex; align-items: center; gap: .9rem; }
-  .dot {
-    width: 14px; height: 14px; border-radius: 50%;
-    background: var(--green); flex-shrink: 0; transition: all .15s;
-  }
-  .dot.active { background: var(--amber); box-shadow: 0 0 12px var(--amber); }
-  .dot.unknown { background: var(--muted); }
-  .hdd .name { font-weight: 600; font-size: .95rem; }
-  .hdd .sub {
-    color: var(--muted); font-size: .78rem;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  }
-  footer {
-    margin-top: 2.5rem; text-align: center; color: var(--muted);
-    font-size: .78rem; border-top: 1px solid var(--border); padding-top: 1rem;
-  }
-  button {
-    background: var(--card); border: 1px solid var(--border); color: var(--text);
-    padding: .45rem 1rem; border-radius: 6px; cursor: pointer;
-    font: inherit; transition: background .15s;
-  }
-  button:hover { background: var(--card-hover); }
-  /* OTA upload */
-  .ota-section { display: flex; flex-direction: column; gap: .75rem; }
-  .ota-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
-  .ota-row input[type=file] {
-    flex: 1; min-width: 140px; font: inherit; color: var(--text);
-    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-    padding: .4rem .6rem; cursor: pointer;
-  }
-  .ota-row input[type=file]::file-selector-button {
-    background: var(--border); color: var(--text); border: none;
-    padding: .3rem .7rem; border-radius: 4px; cursor: pointer; font: inherit;
-    margin-right: .5rem;
-  }
-  .ota-row input[type=text] {
-    flex: 1; min-width: 160px; font: .85rem ui-monospace, SFMono-Regular, Consolas, monospace;
-    color: var(--text); background: var(--bg); border: 1px solid var(--border);
-    border-radius: 6px; padding: .45rem .6rem;
-  }
-  .ota-row input[type=text]::placeholder { color: var(--muted); }
-  .btn-accent {
-    background: #1f6feb; border: 1px solid #388bfd; color: #fff;
-    padding: .45rem 1rem; border-radius: 6px; cursor: pointer;
-    font: inherit; font-weight: 600; transition: background .15s; white-space: nowrap;
-  }
-  .btn-accent:hover { background: #388bfd; }
-  .btn-accent:disabled { opacity: .5; cursor: not-allowed; }
-  .progress-bar {
-    height: 6px; background: var(--border); border-radius: 3px;
-    overflow: hidden; width: 100%;
-  }
-  .progress-fill {
-    height: 100%; background: var(--accent); width: 0;
-    transition: width .15s;
-  }
-  .ota-status { display: flex; align-items: center; gap: .75rem; }
-  #otaMsg {
-    font-size: .85rem;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  }
-  .authbar { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
-  .authbar input {
-    flex: 1; min-width: 160px; font: .85rem ui-monospace, SFMono-Regular, Consolas, monospace;
-    color: var(--text); background: var(--bg); border: 1px solid var(--border);
-    border-radius: 6px; padding: .45rem .6rem;
-  }
-  .hint { font-size: .8rem; }
-  .hint.ok { color: var(--green); }
-  .hint.bad { color: var(--red); }
-  .banner {
-    background: rgba(248,81,73,.12); border: 1px solid var(--red); color: var(--red);
-    border-radius: 8px; padding: .6rem .9rem; margin-bottom: 1rem;
-    font-weight: 600; font-size: .9rem;
-  }
+  :root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;
+    --accent:#58a6ff;--green:#3fb950;--amber:#d29922;--red:#f85149;--blue:#1f6feb;}
+  *{box-sizing:border-box}html,body{margin:0;padding:0}
+  body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);
+    color:var(--text);padding:1.25rem;max-width:920px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);
+    padding-bottom:.6rem;margin-bottom:.8rem;gap:1rem;flex-wrap:wrap}
+  h1{margin:0;font-size:1.3rem;font-weight:600}
+  .meta{color:var(--muted);font-family:ui-monospace,Consolas,monospace;font-size:.8rem;display:flex;
+    gap:.8rem;flex-wrap:wrap;align-items:center}
+  .meta .online{color:var(--green)}.meta .offline{color:var(--red)}
+  h2{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin:1.1rem 0 .5rem;font-weight:600}
+  .keybar{display:flex;gap:.5rem;align-items:center;margin-bottom:.8rem}
+  .keybar input{flex:1;min-width:140px;font:.85rem ui-monospace,Consolas,monospace;color:var(--text);
+    background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.45rem .6rem}
+  .keystate{font-size:.8rem;white-space:nowrap}.keystate.ok{color:var(--green)}.keystate.bad{color:var(--red)}
+  .banner{background:rgba(248,81,73,.12);border:1px solid var(--red);color:var(--red);border-radius:8px;
+    padding:.6rem .9rem;margin-bottom:.8rem;font-weight:600;font-size:.9rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.7rem}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem}
+  .fan .row1{display:flex;justify-content:space-between;align-items:baseline}
+  .fan .title{font-weight:600}.fan .duty{font-family:ui-monospace,Consolas,monospace;color:var(--accent);font-weight:600}
+  .fan input[type=range]{width:100%;accent-color:var(--accent);margin:.7rem 0 .4rem;display:block}
+  .fan .rpm{font-family:ui-monospace,Consolas,monospace;font-size:1.5rem;font-weight:600;line-height:1}
+  .fan .rpm u{color:var(--muted);font-size:.75rem;margin-left:.25rem;font-style:normal}
+  .hdd{display:flex;align-items:center;gap:.8rem}
+  .dot{width:13px;height:13px;border-radius:50%;background:var(--green);flex-shrink:0;transition:.15s}
+  .dot.active{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+  .hdd .name{font-weight:600}.hdd .sub{color:var(--muted);font-size:.76rem;font-family:ui-monospace,Consolas,monospace}
+  button{background:var(--card);border:1px solid var(--border);color:var(--text);padding:.45rem 1rem;
+    border-radius:6px;cursor:pointer;font:inherit;transition:.15s}
+  button:hover{background:#1c2128}
+  .gear{background:none;border:none;font-size:1.2rem;padding:.2rem .4rem}
+  .btn-accent{background:var(--blue);border:1px solid #388bfd;color:#fff;font-weight:600}
+  .btn-accent:hover{background:#388bfd}.btn-accent:disabled{opacity:.5;cursor:not-allowed}
+  .btn-danger{background:#3a1115;border:1px solid var(--red);color:var(--red);font-weight:600}
+  #overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.2s;z-index:5}
+  #overlay.open{opacity:1;pointer-events:auto}
+  #drawer{position:fixed;top:0;right:0;height:100%;width:min(380px,90vw);background:var(--bg);
+    border-left:1px solid var(--border);transform:translateX(100%);transition:transform .2s;z-index:6;
+    overflow-y:auto;padding:1.1rem}
+  #drawer.open{transform:translateX(0)}
+  #drawer .dh{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
+  #drawer h3{font-size:.95rem;margin:1.1rem 0 .5rem}
+  .field{display:flex;flex-direction:column;gap:.4rem;margin-bottom:.5rem}
+  .field input{font:.85rem ui-monospace,Consolas,monospace;color:var(--text);background:var(--card);
+    border:1px solid var(--border);border-radius:6px;padding:.45rem .6rem}
+  .row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .msg{font-size:.8rem;font-family:ui-monospace,Consolas,monospace;min-height:1em}
+  .msg.ok{color:var(--green)}.msg.bad{color:var(--red)}
+  .progress{height:6px;background:var(--border);border-radius:3px;overflow:hidden;width:100%;margin-top:.4rem}
+  .progress>div{height:100%;background:var(--accent);width:0;transition:.15s}
+  .sep{border:none;border-top:1px solid var(--border);margin:1rem 0}
+  input[type=file]{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--border);
+    border-radius:6px;padding:.35rem .5rem;width:100%}
 </style>
 </head>
 <body>
 <header>
   <h1>OpenNAS</h1>
   <div class="meta">
-    <span id="status">conectando…</span>
-    <span id="ip"></span>
-    <span id="version"></span>
-    <span id="uptime"></span>
-    <span id="heap"></span>
+    <span id="status">conectando…</span><span id="ip"></span><span id="version"></span>
+    <span id="uptime"></span><span id="heap"></span>
+    <span id="keyhdr" class="keystate"></span>
+    <button class="gear" onclick="openDrawer()" title="Ajustes">⚙️</button>
   </div>
 </header>
 
-<div class="authbar">
-  <input type="password" id="token" placeholder="API token (Bearer)" autocomplete="off"
-    oninput="saveToken()">
-  <span id="authMsg" class="hint"></span>
+<div class="keybar">
+  <input type="password" id="key" placeholder="Clave de control" autocomplete="off" oninput="saveKey()">
+  <span id="keystate" class="keystate"></span>
 </div>
 
-<div id="failsafeBanner" class="banner" hidden></div>
+<div id="banner" class="banner" hidden></div>
 
 <h2>Ventiladores</h2>
 <div id="fans" class="grid">Cargando…</div>
@@ -168,290 +87,153 @@
 <h2>Discos duros</h2>
 <div id="hdds" class="grid">Cargando…</div>
 
-<h2>Firmware</h2>
-<div class="card ota-section">
-  <div class="ota-row">
-    <input type="file" accept=".bin" id="otaFile">
-    <button class="btn-accent" id="otaBtn" onclick="uploadFirmware()">Actualizar</button>
-  </div>
-  <div class="ota-status" id="otaStatus" hidden>
-    <div class="progress-bar" style="flex:1"><div class="progress-fill" id="otaFill"></div></div>
-    <span id="otaPct" style="min-width:3em;text-align:right;font-size:.85rem;font-family:ui-monospace,Consolas,monospace">0%</span>
-  </div>
-  <div id="otaMsg"></div>
-</div>
+<div id="overlay" onclick="closeDrawer()"></div>
+<aside id="drawer">
+  <div class="dh"><b>Ajustes</b><button class="gear" onclick="closeDrawer()">✕</button></div>
 
-<h2>Token de API</h2>
-<div class="card ota-section">
-  <div class="ota-row">
-    <input type="text" id="newToken" placeholder="Nuevo token (se guarda en el dispositivo, NVS)">
-    <button class="btn-accent" onclick="provisionToken()">Fijar en el dispositivo</button>
-  </div>
-  <div id="tokMsg" class="hint"></div>
-</div>
+  <h3>Dispositivo</h3>
+  <button class="btn-danger" onclick="reboot()">⟳ Reiniciar ESP</button>
 
-<footer>
-  <button onclick="resetWifi()">Borrar credenciales WiFi</button>
-</footer>
+  <hr class="sep">
+  <h3>Cambiar clave de control</h3>
+  <div class="field"><input type="text" id="newKey" placeholder="Nueva clave"></div>
+  <div class="row"><button class="btn-accent" onclick="changeKey()">Fijar clave</button></div>
+  <div id="keyMsg" class="msg"></div>
+
+  <hr class="sep">
+  <h3>Cambiar WiFi</h3>
+  <div class="field"><input type="text" id="ssid" placeholder="SSID (red del homelab)"></div>
+  <div class="field"><input type="password" id="wpass" placeholder="Contraseña WiFi"></div>
+  <div class="row"><button class="btn-accent" onclick="changeWifi()">Conectar a esa red</button></div>
+  <div id="wifiMsg" class="msg"></div>
+
+  <hr class="sep">
+  <h3>Actualizar firmware (OTA)</h3>
+  <input type="file" accept=".bin" id="otaFile">
+  <div class="row" style="margin-top:.5rem"><button class="btn-accent" id="otaBtn" onclick="uploadFw()">Actualizar</button></div>
+  <div class="progress" id="otaBar" hidden><div id="otaFill"></div></div>
+  <div id="otaMsg" class="msg"></div>
+
+  <hr class="sep">
+  <h3>WiFi</h3>
+  <button class="btn-danger" onclick="resetWifi()">Borrar credenciales WiFi</button>
+</aside>
 
 <script>
-  const $ = (id) => document.getElementById(id);
-
-  /* ---- API token (Bearer) ---- */
-  const TOKEN_KEY = 'opennas_token';
-  const getToken = () => localStorage.getItem(TOKEN_KEY) || '';
-  function saveToken() {
-    localStorage.setItem(TOKEN_KEY, $('token').value);
-    setAuthMsg('', '');
+  const $=(id)=>document.getElementById(id);
+  const KEY='opennas_token';
+  const getKey=()=>localStorage.getItem(KEY)||'';
+  function saveKey(){localStorage.setItem(KEY,$('key').value)}
+  function authH(extra){const t=getKey();return Object.assign(t?{'Authorization':'Bearer '+t}:{},extra||{})}
+  function setKeyState(ok){
+    const t=$('keystate'),h=$('keyhdr');
+    if(ok===null){t.textContent='';t.className='keystate';h.textContent='';h.className='keystate';return}
+    t.textContent=ok?'✓ válida':'✗ clave incorrecta';t.className='keystate '+(ok?'ok':'bad');
+    h.textContent=ok?'🔑✓':'🔑✗';h.className='keystate '+(ok?'ok':'bad');
   }
-  function authHeaders(extra) {
-    const t = getToken();
-    return Object.assign(t ? { 'Authorization': 'Bearer ' + t } : {}, extra || {});
+  async function apiPost(path,opts){
+    try{const r=await fetch(path,opts);if(r.status===401)setKeyState(false);else if(r.ok)setKeyState(true);return r}
+    catch(e){return null}
   }
-  function setAuthMsg(text, cls) {
-    const el = $('authMsg'); el.textContent = text; el.className = 'hint ' + (cls || '');
+  function openDrawer(){$('drawer').classList.add('open');$('overlay').classList.add('open')}
+  function closeDrawer(){$('drawer').classList.remove('open');$('overlay').classList.remove('open')}
+  const fmtUp=(s)=>{const d=s/86400|0,h=s/3600%24|0,m=s/60%60|0;return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`};
+  const fmtAgo=(ms)=>ms<1000?`${ms}ms`:ms<60000?`${ms/1000|0}s`:ms<3600000?`${ms/60000|0}m`:`${ms/3600000|0}h`;
+  const fmtB=(n)=>n<1024?`${n}B`:n<1048576?`${(n/1024).toFixed(1)}KB`:`${(n/1048576).toFixed(1)}MB`;
+  async function setFan(id,duty){await apiPost(`/api/fan/${id}`,{method:'POST',headers:authH({'Content-Type':'application/json'}),body:JSON.stringify({duty})})}
+  async function reboot(){
+    if(!confirm('¿Reiniciar el ESP? Volverá en unos segundos (failsafe al 100%).'))return;
+    const r=await apiPost('/api/reboot',{method:'POST',headers:authH()});
+    if(r&&r.status===401){alert('Clave incorrecta');return}
+    closeDrawer();$('status').textContent='reiniciando…';$('status').className='offline';
   }
-  /* Wrapper: warns in the auth bar on 401. Returns the Response (or null on network error). */
-  async function apiPost(path, opts) {
-    try {
-      const r = await fetch(path, opts);
-      if (r.status === 401) setAuthMsg('token incorrecto o ausente', 'bad');
-      else if (r.ok) setAuthMsg('', '');
-      return r;
-    } catch (e) { return null; }
+  async function changeKey(){
+    const t=$('newKey').value.trim(),m=$('keyMsg');
+    if(!t){m.textContent='Escribe una clave';m.className='msg bad';return}
+    m.textContent='Fijando…';m.className='msg';
+    const r=await apiPost('/api/set_token',{method:'POST',headers:authH({'Content-Type':'application/json'}),body:JSON.stringify({token:t})});
+    if(!r){m.textContent='Error de conexión';m.className='msg bad';return}
+    if(r.status===401){m.textContent='La clave ACTUAL (arriba) es incorrecta';m.className='msg bad';return}
+    if(!r.ok){m.textContent='Error '+r.status;m.className='msg bad';return}
+    localStorage.setItem(KEY,t);$('key').value=t;$('newKey').value='';
+    m.textContent='Clave fijada y guardada ✓';m.className='msg ok';setKeyState(true);
   }
-
-  const fmtUptime = (s) => {
-    const d = Math.floor(s / 86400), h = Math.floor(s / 3600) % 24,
-          m = Math.floor(s / 60) % 60, sec = s % 60;
-    if (d) return `${d}d ${h}h`;
-    if (h) return `${h}h ${m}m`;
-    if (m) return `${m}m ${sec}s`;
-    return `${sec}s`;
-  };
-
-  const fmtAgo = (ms) => {
-    if (ms < 1000) return `${ms}ms`;
-    if (ms < 60000) return `${(ms / 1000) | 0}s`;
-    if (ms < 3600000) return `${(ms / 60000) | 0}m`;
-    return `${(ms / 3600000) | 0}h`;
-  };
-
-  const fmtBytes = (n) => {
-    if (n < 1024) return `${n}B`;
-    if (n < 1048576) return `${(n / 1024).toFixed(1)}KB`;
-    return `${(n / 1048576).toFixed(1)}MB`;
-  };
-
-  async function setFan(id, duty) {
-    await apiPost(`/api/fan/${id}`, {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ duty })
-    });
+  async function changeWifi(){
+    const ssid=$('ssid').value.trim(),pass=$('wpass').value,m=$('wifiMsg');
+    if(!ssid){m.textContent='Escribe el SSID';m.className='msg bad';return}
+    if(!confirm(`El ESP se reconectará a "${ssid}" y reiniciará. Tendrás que abrir el dashboard en su nueva IP. ¿Continuar?`))return;
+    m.textContent='Guardando y reiniciando…';m.className='msg';
+    const r=await apiPost('/api/set_wifi',{method:'POST',headers:authH({'Content-Type':'application/json'}),body:JSON.stringify({ssid,pass})});
+    if(!r){m.textContent='Enviado; el ESP está reiniciando. Búscalo en la red nueva.';m.className='msg ok';return}
+    if(r.status===401){m.textContent='Clave de control incorrecta';m.className='msg bad';return}
+    m.textContent='OK, reconectando a la red nueva. Abre el dashboard en su nueva IP.';m.className='msg ok';
   }
-
-  async function resetWifi() {
-    if (!confirm('Esto borrará las credenciales WiFi y reiniciará en modo AP. ¿Continuar?')) return;
-    const r = await apiPost('/api/reset_wifi', { method: 'POST', headers: authHeaders() });
-    if (r && r.status === 401) return;   // bad token, keep the page
-    document.body.innerHTML = '<p style="padding:2rem;text-align:center;font-family:sans-serif">Reiniciando…</p>';
+  async function resetWifi(){
+    if(!confirm('Borra las credenciales WiFi y reinicia en modo AP. ¿Continuar?'))return;
+    const r=await apiPost('/api/reset_wifi',{method:'POST',headers:authH()});
+    if(r&&r.status===401){alert('Clave incorrecta');return}
+    document.body.innerHTML='<p style="padding:2rem;text-align:center">Reiniciando en modo AP…</p>';
   }
-
-  async function provisionToken() {
-    const t = $('newToken').value.trim();
-    if (!t) { alert('Escribe un token'); return; }
-    const msg = $('tokMsg');
-    msg.textContent = 'Fijando…'; msg.className = 'hint';
-    const r = await apiPost('/api/set_token', {
-      method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ token: t })
-    });
-    if (!r) { msg.textContent = 'Error de conexión'; msg.className = 'hint bad'; return; }
-    if (r.status === 401) { msg.textContent = 'El token actual (campo de arriba) es incorrecto'; msg.className = 'hint bad'; return; }
-    if (!r.ok) { msg.textContent = 'Error ' + r.status; msg.className = 'hint bad'; return; }
-    // success: the new token is now the active one — store it so further POSTs work
-    localStorage.setItem(TOKEN_KEY, t);
-    $('token').value = t; $('newToken').value = '';
-    msg.textContent = 'Token fijado en el dispositivo y guardado en este navegador ✓'; msg.className = 'hint ok';
-  }
-
-  function renderFans(fans) {
-    const el = $('fans');
-    if (el.children.length !== fans.length) {
-      el.innerHTML = fans.map(f => `
-        <div class="card fan">
-          <div class="row1">
-            <span class="title">FAN ${f.id}</span>
-            <span class="duty"><span id="fd${f.id}">${f.duty}</span>%</span>
-          </div>
-          <input type="range" min="0" max="100" value="${f.duty}" id="fs${f.id}"
-            oninput="$('fd'+${f.id}).textContent=this.value"
-            onchange="setFan(${f.id}, +this.value)">
-          <div>
-            <span class="rpm" id="fr${f.id}">${f.rpm}</span><span class="rpm-unit">RPM</span>
-          </div>
-        </div>
-      `).join('');
-    } else {
-      fans.forEach(f => {
-        $('fr' + f.id).textContent = f.rpm;
-        const slider = $('fs' + f.id);
-        if (document.activeElement !== slider) {
-          slider.value = f.duty;
-          $('fd' + f.id).textContent = f.duty;
-        }
-      });
-    }
-  }
-
-  function renderHdds(hdds) {
-    const el = $('hdds');
-    if (el.children.length !== hdds.length) {
-      el.innerHTML = hdds.map(h => `
-        <div class="card hdd">
-          <div class="dot" id="hd${h.id}"></div>
-          <div>
-            <div class="name">HDD ${h.id}</div>
-            <div class="sub" id="hs${h.id}">—</div>
-          </div>
-        </div>
-      `).join('');
-    }
-    hdds.forEach(h => {
-      $('hd' + h.id).classList.toggle('active', h.active);
-      const status = h.active
-        ? 'activity'
-        : (h.events ? `idle · ${fmtAgo(h.last_ms)} ago` : 'idle');
-      $('hs' + h.id).textContent = `${status} · ${h.events} ev`;
-    });
-  }
-
-  async function poll() {
-    try {
-      const r = await fetch('/api/status');
-      if (!r.ok) throw 0;
-      const d = await r.json();
-      const st = $('status');
-      st.textContent = 'online'; st.className = 'online';
-      $('ip').textContent = d.ip || '';
-      $('version').textContent = d.version ? `fw ${d.version.slice(0, 14)}` : '';
-      $('uptime').textContent = d.uptime_s != null ? `up ${fmtUptime(d.uptime_s)}` : '';
-      $('heap').textContent = d.free_heap != null ? `heap ${fmtBytes(d.free_heap)}` : '';
-      renderFans(d.fans);
-      renderHdds(d.hdds);
-      const banner = $('failsafeBanner');
-      if (d.failsafe) {
-        const since = (d.ms_since_cmd >= 4294967295)
-          ? 'sin comando desde el arranque'
-          : `último comando hace ${fmtAgo(d.ms_since_cmd)}`;
-        banner.textContent = `⚠ FAILSAFE — ventiladores forzados al 100% · ${since}`;
-        banner.hidden = false;
-      } else {
-        banner.hidden = true;
-      }
-    } catch (e) {
-      const st = $('status');
-      st.textContent = 'offline'; st.className = 'offline';
-    }
-  }
-
-  /* ---- OTA upload ---- */
-
-  function uploadFirmware() {
-    const file = $('otaFile').files[0];
-    if (!file) { alert('Selecciona un archivo .bin'); return; }
-    if (!file.name.endsWith('.bin')) {
-      if (!confirm(`El archivo "${file.name}" no es .bin. ¿Continuar?`)) return;
-    }
-
-    const btn = $('otaBtn');
-    const status = $('otaStatus');
-    const fill = $('otaFill');
-    const pct = $('otaPct');
-    const msg = $('otaMsg');
-
-    btn.disabled = true;
-    status.hidden = false;
-    fill.style.width = '0';
-    pct.textContent = '0%';
-    msg.textContent = 'Subiendo firmware…';
-    msg.style.color = 'var(--muted)';
-
-    const xhr = new XMLHttpRequest();
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        const p = Math.round(e.loaded / e.total * 100);
-        fill.style.width = p + '%';
-        pct.textContent = p + '%';
-        msg.textContent = `Subiendo… ${(e.loaded / 1024).toFixed(0)} / ${(e.total / 1024).toFixed(0)} KB`;
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status === 200) {
-        fill.style.width = '100%';
-        fill.style.background = 'var(--green)';
-        msg.textContent = 'Firmware aceptado. Reiniciando…';
-        msg.style.color = 'var(--green)';
-        // Pause polling, wait for device to come back
-        clearInterval(pollTimer);
-        setTimeout(() => {
-          msg.textContent = 'Esperando reconexión…';
-          waitForReboot();
-        }, 3000);
-      } else {
-        fill.style.background = 'var(--red)';
-        msg.textContent = `Error ${xhr.status}: ${xhr.responseText}`;
-        msg.style.color = 'var(--red)';
-        btn.disabled = false;
-      }
-    };
-
-    xhr.onerror = () => {
-      msg.textContent = 'Error de conexión';
-      msg.style.color = 'var(--red)';
-      btn.disabled = false;
-    };
-
-    xhr.open('POST', '/api/ota');
-    const tk = getToken();
-    if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
-    xhr.send(file);
-  }
-
-  async function waitForReboot() {
-    const msg = $('otaMsg');
-    for (let i = 0; i < 30; i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      try {
-        const r = await fetch('/api/status');
-        if (r.ok) {
-          msg.textContent = 'Dispositivo online con nuevo firmware.';
-          msg.style.color = 'var(--green)';
-          $('otaBtn').disabled = false;
-          $('otaFill').style.background = 'var(--accent)';
-          $('otaFill').style.width = '0';
-          $('otaStatus').hidden = true;
-          pollTimer = setInterval(poll, 1500);
-          poll();
-          return;
-        }
-      } catch (e) { /* still rebooting */ }
-      msg.textContent = `Esperando reconexión… (${(i + 1) * 2}s)`;
-    }
-    msg.textContent = 'Timeout esperando al dispositivo. Recarga la página manualmente.';
-    msg.style.color = 'var(--red)';
-    $('otaBtn').disabled = false;
-  }
-
-  /* ---- Start polling ---- */
-
   let pollTimer;
-  $('token').value = getToken();
-  poll();
-  pollTimer = setInterval(poll, 1500);
+  function uploadFw(){
+    const f=$('otaFile').files[0];if(!f){alert('Selecciona un .bin');return}
+    const btn=$('otaBtn'),bar=$('otaBar'),fill=$('otaFill'),m=$('otaMsg');
+    btn.disabled=true;bar.hidden=false;fill.style.width='0';fill.style.background='var(--accent)';
+    m.textContent='Subiendo…';m.className='msg';
+    const x=new XMLHttpRequest();
+    x.upload.onprogress=(e)=>{if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);fill.style.width=p+'%';m.textContent=`Subiendo… ${p}%`}};
+    x.onload=()=>{
+      if(x.status===200){fill.style.width='100%';fill.style.background='var(--green)';m.textContent='Aceptado. Reiniciando…';m.className='msg ok';
+        clearInterval(pollTimer);setTimeout(waitReboot,3000);}
+      else{fill.style.background='var(--red)';m.textContent=`Error ${x.status}: ${x.responseText}`;m.className='msg bad';btn.disabled=false;}
+    };
+    x.onerror=()=>{m.textContent='Error de conexión';m.className='msg bad';btn.disabled=false};
+    x.open('POST','/api/ota');const t=getKey();if(t)x.setRequestHeader('Authorization','Bearer '+t);x.send(f);
+  }
+  async function waitReboot(){
+    const m=$('otaMsg');
+    for(let i=0;i<30;i++){await new Promise(r=>setTimeout(r,2000));
+      try{const r=await fetch('/api/status');if(r.ok){m.textContent='Online con nuevo firmware ✓';m.className='msg ok';
+        $('otaBtn').disabled=false;$('otaBar').hidden=true;pollTimer=setInterval(poll,1500);poll();return}}catch(e){}
+      m.textContent=`Esperando reconexión… (${(i+1)*2}s)`;}
+    m.textContent='Timeout. Recarga la página.';m.className='msg bad';$('otaBtn').disabled=false;
+  }
+  function renderFans(fans){
+    const el=$('fans');
+    if(el.children.length!==fans.length){
+      el.innerHTML=fans.map(f=>`<div class="card fan"><div class="row1"><span class="title">FAN ${f.id}</span>
+        <span class="duty"><span id="fd${f.id}">${f.duty}</span>%</span></div>
+        <input type="range" min="0" max="100" value="${f.duty}" id="fs${f.id}"
+          oninput="$('fd'+${f.id}).textContent=this.value" onchange="setFan(${f.id},+this.value)">
+        <div class="rpm" id="fr${f.id}">${f.rpm}<u>RPM</u></div></div>`).join('');
+    }else{fans.forEach(f=>{$('fr'+f.id).innerHTML=`${f.rpm}<u>RPM</u>`;const s=$('fs'+f.id);
+      if(document.activeElement!==s){s.value=f.duty;$('fd'+f.id).textContent=f.duty}})}
+  }
+  function renderHdds(hdds){
+    const el=$('hdds');
+    if(el.children.length!==hdds.length){
+      el.innerHTML=hdds.map(h=>`<div class="card hdd"><div class="dot" id="hd${h.id}"></div>
+        <div><div class="name">HDD ${h.id}</div><div class="sub" id="hs${h.id}">—</div></div></div>`).join('');
+    }
+    hdds.forEach(h=>{$('hd'+h.id).classList.toggle('active',h.active);
+      const st=h.active?'activity':(h.events?`idle · ${fmtAgo(h.last_ms)}`:'idle');
+      $('hs'+h.id).textContent=`${st} · ${h.events} ev`})
+  }
+  async function poll(){
+    try{
+      const r=await fetch('/api/status');if(!r.ok)throw 0;const d=await r.json();
+      $('status').textContent='online';$('status').className='online';
+      $('ip').textContent=d.ip||'';$('version').textContent=d.version?`fw ${d.version.slice(0,14)}`:'';
+      $('uptime').textContent=d.uptime_s!=null?`up ${fmtUp(d.uptime_s)}`:'';
+      $('heap').textContent=d.free_heap!=null?`heap ${fmtB(d.free_heap)}`:'';
+      renderFans(d.fans);renderHdds(d.hdds);
+      const b=$('banner');
+      if(d.failsafe){const s=d.ms_since_cmd>=4294967295?'sin comando desde el arranque':`último comando hace ${fmtAgo(d.ms_since_cmd)}`;
+        b.textContent=`⚠ FAILSAFE — ventiladores al 100% · ${s}`;b.hidden=false;}else b.hidden=true;
+    }catch(e){$('status').textContent='offline';$('status').className='offline';}
+  }
+  $('key').value=getKey();if(!getKey())setKeyState(null);
+  poll();pollTimer=setInterval(poll,1500);
 </script>
 </body>
 </html>
