@@ -43,6 +43,9 @@ Base: `http://<ip-del-esp>/`. La IP se ve en `GET /api/status` y en el log de ar
 | GET | `/` | — | Dashboard HTML embebido. |
 | GET | `/api/status` | **abierto** | Estado completo (JSON, ver abajo). |
 | POST | `/api/fan/{0,1}` | **Bearer** | `{"duty":0..100}` → 204. Aplica el duty y refresca el watchdog. |
+| POST | `/api/set_token` | **Bearer** | `{"token":".."}` → fija el token de auth en NVS y lo aplica al instante (sin reboot). |
+| POST | `/api/set_wifi` | **Bearer** | `{"ssid":"..","pass":".."}` → guarda creds WiFi y reinicia para reconectar. |
+| POST | `/api/reboot` | **Bearer** | Reinicia el ESP. |
 | POST | `/api/reset_wifi` | **Bearer** | Borra credenciales WiFi y reinicia a modo AP. |
 | POST | `/api/ota` | **Bearer** | Sube una imagen de firmware (binario) y reinicia a ella. |
 
@@ -58,9 +61,13 @@ Base: `http://<ip-del-esp>/`. La IP se ve en `GET /api/status` y en el log de ar
   "ms_since_cmd": 4200,
   "version": "...",
   "build_date": "...",
-  "ip": "192.168.1.153"
+  "ip": "10.10.10.50",
+  "mac": "3c:dc:75:83:fb:9c"
 }
 ```
+
+> `mac` (la MAC WiFi) sirve para la reserva DHCP en fw01 (dnsmasq). El ESP está en la red del homelab:
+> `opennas.lab.mquero.com` = `10.10.10.50` (movido desde la WiFi de casa con "Cambiar WiFi" en el dashboard).
 
 - `failsafe` (bool): true si el watchdog ha forzado el modo seguro (sin comando reciente).
 - `ms_since_cmd`: milisegundos desde el último `POST /api/fan` (UINT32_MAX si nunca hubo).
@@ -68,14 +75,16 @@ Base: `http://<ip-del-esp>/`. La IP se ve en `GET /api/status` y en el log de ar
 ### Autenticación
 
 Los **POST** exigen `Authorization: Bearer <token>`. `GET /api/status` queda abierto (solo lectura).
-Un solo token gobierna todos los endpoints de escritura (fan, reset_wifi, ota) — `http_auth_ok` en
-`http_server.h` es la única puerta de auth.
+Un solo token gobierna todos los endpoints de escritura (fan, set_token, set_wifi, reboot, reset_wifi,
+ota) — `http_auth_ok` en `http_server.h` es la única puerta de auth.
 
-**Token efectivo:** NVS `opennas/auth_token` si existe; si no, `CONFIG_OPENNAS_AUTH_TOKEN` (Kconfig).
-Comparación en tiempo constante; fail-closed si el token está vacío.
+**Token efectivo:** NVS `opennas/auth_token` si existe; si no, `CONFIG_OPENNAS_AUTH_TOKEN` (Kconfig,
+placeholder `changeme`). Comparación en tiempo constante; fail-closed si el token está vacío. Se cambia
+desde el dashboard (cajón "Cambiar clave") o por `POST /api/set_token`. El mismo valor va al `.env` del
+cockpit (`OPENNAS_TOKEN`) para que el `fan-controller` lo use.
 
 ```bash
-curl -X POST http://192.168.1.153/api/fan/0 -H "Authorization: Bearer <TOKEN>" -d '{"duty":40}'
+curl -X POST http://opennas.lab.mquero.com/api/fan/0 -H "Authorization: Bearer <TOKEN>" -d '{"duty":40}'
 ```
 
 ### Failsafe (watchdog de ventiladores)
