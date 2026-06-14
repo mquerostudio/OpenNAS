@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>OpenNAS</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --card-hover: #1c2128;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --amber: #d29922;
+    --red: #f85149;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 1.25rem; max-width: 960px; margin: 0 auto;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-bottom: 1px solid var(--border); padding-bottom: .75rem;
+    margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap;
+  }
+  h1 { margin: 0; font-size: 1.4rem; font-weight: 600; letter-spacing: -.01em; }
+  h2 {
+    font-size: .78rem; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .1em; margin: 1.5rem 0 .6rem; font-weight: 600;
+  }
+  .meta {
+    color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: .82rem; display: flex; gap: 1rem; flex-wrap: wrap;
+  }
+  .meta .offline { color: var(--red); }
+  .meta .online { color: var(--green); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: .75rem;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: .9rem 1rem;
+  }
+  .fan .row1 { display: flex; justify-content: space-between; align-items: baseline; }
+  .fan .title { font-weight: 600; font-size: .95rem; }
+  .fan .duty {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    color: var(--accent); font-weight: 600;
+  }
+  .fan input[type=range] {
+    width: 100%; accent-color: var(--accent);
+    margin: .75rem 0 .5rem; display: block;
+  }
+  .fan .rpm {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 1.6rem; font-weight: 600; line-height: 1;
+  }
+  .fan .rpm-unit { color: var(--muted); font-size: .8rem; margin-left: .25rem; }
+  .hdd { display: flex; align-items: center; gap: .9rem; }
+  .dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--green); flex-shrink: 0; transition: all .15s;
+  }
+  .dot.active { background: var(--amber); box-shadow: 0 0 12px var(--amber); }
+  .dot.unknown { background: var(--muted); }
+  .hdd .name { font-weight: 600; font-size: .95rem; }
+  .hdd .sub {
+    color: var(--muted); font-size: .78rem;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  footer {
+    margin-top: 2.5rem; text-align: center; color: var(--muted);
+    font-size: .78rem; border-top: 1px solid var(--border); padding-top: 1rem;
+  }
+  button {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: .45rem 1rem; border-radius: 6px; cursor: pointer;
+    font: inherit; transition: background .15s;
+  }
+  button:hover { background: var(--card-hover); }
+  /* OTA upload */
+  .ota-section { display: flex; flex-direction: column; gap: .75rem; }
+  .ota-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+  .ota-row input[type=file] {
+    flex: 1; min-width: 140px; font: inherit; color: var(--text);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: .4rem .6rem; cursor: pointer;
+  }
+  .ota-row input[type=file]::file-selector-button {
+    background: var(--border); color: var(--text); border: none;
+    padding: .3rem .7rem; border-radius: 4px; cursor: pointer; font: inherit;
+    margin-right: .5rem;
+  }
+  .ota-row input[type=text] {
+    flex: 1; min-width: 160px; font: .85rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    color: var(--text); background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: .45rem .6rem;
+  }
+  .ota-row input[type=text]::placeholder { color: var(--muted); }
+  .btn-accent {
+    background: #1f6feb; border: 1px solid #388bfd; color: #fff;
+    padding: .45rem 1rem; border-radius: 6px; cursor: pointer;
+    font: inherit; font-weight: 600; transition: background .15s; white-space: nowrap;
+  }
+  .btn-accent:hover { background: #388bfd; }
+  .btn-accent:disabled { opacity: .5; cursor: not-allowed; }
+  .progress-bar {
+    height: 6px; background: var(--border); border-radius: 3px;
+    overflow: hidden; width: 100%;
+  }
+  .progress-fill {
+    height: 100%; background: var(--accent); width: 0;
+    transition: width .15s;
+  }
+  .ota-status { display: flex; align-items: center; gap: .75rem; }
+  #otaMsg {
+    font-size: .85rem;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>OpenNAS</h1>
+  <div class="meta">
+    <span id="status">conectando…</span>
+    <span id="ip"></span>
+    <span id="version"></span>
+    <span id="uptime"></span>
+    <span id="heap"></span>
+  </div>
+</header>
+
+<h2>Ventiladores</h2>
+<div id="fans" class="grid">Cargando…</div>
+
+<h2>Discos duros</h2>
+<div id="hdds" class="grid">Cargando…</div>
+
+<h2>Firmware</h2>
+<div class="card ota-section">
+  <div class="ota-row">
+    <input type="file" accept=".bin" id="otaFile">
+    <button class="btn-accent" id="otaBtn" onclick="uploadFirmware()">Actualizar</button>
+  </div>
+  <div class="ota-status" id="otaStatus" hidden>
+    <div class="progress-bar" style="flex:1"><div class="progress-fill" id="otaFill"></div></div>
+    <span id="otaPct" style="min-width:3em;text-align:right;font-size:.85rem;font-family:ui-monospace,Consolas,monospace">0%</span>
+  </div>
+  <div id="otaMsg"></div>
+</div>
+
+<footer>
+  <button onclick="resetWifi()">Borrar credenciales WiFi</button>
+</footer>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const fmtUptime = (s) => {
+    const d = Math.floor(s / 86400), h = Math.floor(s / 3600) % 24,
+          m = Math.floor(s / 60) % 60, sec = s % 60;
+    if (d) return `${d}d ${h}h`;
+    if (h) return `${h}h ${m}m`;
+    if (m) return `${m}m ${sec}s`;
+    return `${sec}s`;
+  };
+
+  const fmtAgo = (ms) => {
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000) | 0}s`;
+    if (ms < 3600000) return `${(ms / 60000) | 0}m`;
+    return `${(ms / 3600000) | 0}h`;
+  };
+
+  const fmtBytes = (n) => {
+    if (n < 1024) return `${n}B`;
+    if (n < 1048576) return `${(n / 1024).toFixed(1)}KB`;
+    return `${(n / 1048576).toFixed(1)}MB`;
+  };
+
+  async function setFan(id, duty) {
+    try {
+      await fetch(`/api/fan/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duty })
+      });
+    } catch (e) { /* ignore */ }
+  }
+
+  async function resetWifi() {
+    if (!confirm('Esto borrará las credenciales WiFi y reiniciará en modo AP. ¿Continuar?')) return;
+    try {
+      await fetch('/api/reset_wifi', { method: 'POST' });
+    } catch (e) { /* ignore */ }
+    document.body.innerHTML = '<p style="padding:2rem;text-align:center;font-family:sans-serif">Reiniciando…</p>';
+  }
+
+  function renderFans(fans) {
+    const el = $('fans');
+    if (el.children.length !== fans.length) {
+      el.innerHTML = fans.map(f => `
+        <div class="card fan">
+          <div class="row1">
+            <span class="title">FAN ${f.id}</span>
+            <span class="duty"><span id="fd${f.id}">${f.duty}</span>%</span>
+          </div>
+          <input type="range" min="0" max="100" value="${f.duty}" id="fs${f.id}"
+            oninput="$('fd'+${f.id}).textContent=this.value"
+            onchange="setFan(${f.id}, +this.value)">
+          <div>
+            <span class="rpm" id="fr${f.id}">${f.rpm}</span><span class="rpm-unit">RPM</span>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      fans.forEach(f => {
+        $('fr' + f.id).textContent = f.rpm;
+        const slider = $('fs' + f.id);
+        if (document.activeElement !== slider) {
+          slider.value = f.duty;
+          $('fd' + f.id).textContent = f.duty;
+        }
+      });
+    }
+  }
+
+  function renderHdds(hdds) {
+    const el = $('hdds');
+    if (el.children.length !== hdds.length) {
+      el.innerHTML = hdds.map(h => `
+        <div class="card hdd">
+          <div class="dot" id="hd${h.id}"></div>
+          <div>
+            <div class="name">HDD ${h.id}</div>
+            <div class="sub" id="hs${h.id}">—</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    hdds.forEach(h => {
+      $('hd' + h.id).classList.toggle('active', h.active);
+      const status = h.active
+        ? 'activity'
+        : (h.events ? `idle · ${fmtAgo(h.last_ms)} ago` : 'idle');
+      $('hs' + h.id).textContent = `${status} · ${h.events} ev`;
+    });
+  }
+
+  async function poll() {
+    try {
+      const r = await fetch('/api/status');
+      if (!r.ok) throw 0;
+      const d = await r.json();
+      const st = $('status');
+      st.textContent = 'online'; st.className = 'online';
+      $('ip').textContent = d.ip || '';
+      $('version').textContent = d.version ? `fw ${d.version.slice(0, 14)}` : '';
+      $('uptime').textContent = d.uptime_s != null ? `up ${fmtUptime(d.uptime_s)}` : '';
+      $('heap').textContent = d.free_heap != null ? `heap ${fmtBytes(d.free_heap)}` : '';
+      renderFans(d.fans);
+      renderHdds(d.hdds);
+    } catch (e) {
+      const st = $('status');
+      st.textContent = 'offline'; st.className = 'offline';
+    }
+  }
+
+  /* ---- OTA upload ---- */
+
+  function uploadFirmware() {
+    const file = $('otaFile').files[0];
+    if (!file) { alert('Selecciona un archivo .bin'); return; }
+    if (!file.name.endsWith('.bin')) {
+      if (!confirm(`El archivo "${file.name}" no es .bin. ¿Continuar?`)) return;
+    }
+
+    const btn = $('otaBtn');
+    const status = $('otaStatus');
+    const fill = $('otaFill');
+    const pct = $('otaPct');
+    const msg = $('otaMsg');
+
+    btn.disabled = true;
+    status.hidden = false;
+    fill.style.width = '0';
+    pct.textContent = '0%';
+    msg.textContent = 'Subiendo firmware…';
+    msg.style.color = 'var(--muted)';
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const p = Math.round(e.loaded / e.total * 100);
+        fill.style.width = p + '%';
+        pct.textContent = p + '%';
+        msg.textContent = `Subiendo… ${(e.loaded / 1024).toFixed(0)} / ${(e.total / 1024).toFixed(0)} KB`;
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        fill.style.width = '100%';
+        fill.style.background = 'var(--green)';
+        msg.textContent = 'Firmware aceptado. Reiniciando…';
+        msg.style.color = 'var(--green)';
+        // Pause polling, wait for device to come back
+        clearInterval(pollTimer);
+        setTimeout(() => {
+          msg.textContent = 'Esperando reconexión…';
+          waitForReboot();
+        }, 3000);
+      } else {
+        fill.style.background = 'var(--red)';
+        msg.textContent = `Error ${xhr.status}: ${xhr.responseText}`;
+        msg.style.color = 'var(--red)';
+        btn.disabled = false;
+      }
+    };
+
+    xhr.onerror = () => {
+      msg.textContent = 'Error de conexión';
+      msg.style.color = 'var(--red)';
+      btn.disabled = false;
+    };
+
+    xhr.open('POST', '/api/ota');
+    xhr.send(file);
+  }
+
+  async function waitForReboot() {
+    const msg = $('otaMsg');
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const r = await fetch('/api/status');
+        if (r.ok) {
+          msg.textContent = 'Dispositivo online con nuevo firmware.';
+          msg.style.color = 'var(--green)';
+          $('otaBtn').disabled = false;
+          $('otaFill').style.background = 'var(--accent)';
+          $('otaFill').style.width = '0';
+          $('otaStatus').hidden = true;
+          pollTimer = setInterval(poll, 1500);
+          poll();
+          return;
+        }
+      } catch (e) { /* still rebooting */ }
+      msg.textContent = `Esperando reconexión… (${(i + 1) * 2}s)`;
+    }
+    msg.textContent = 'Timeout esperando al dispositivo. Recarga la página manualmente.';
+    msg.style.color = 'var(--red)';
+    $('otaBtn').disabled = false;
+  }
+
+  /* ---- Start polling ---- */
+
+  let pollTimer;
+  poll();
+  pollTimer = setInterval(poll, 1500);
+</script>
+</body>
+</html>

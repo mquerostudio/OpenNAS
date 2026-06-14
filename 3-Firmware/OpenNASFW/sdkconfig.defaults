@@ -1,0 +1,40 @@
+# OpenNAS firmware defaults for ESP32-C5-WROOM-1
+# Delete the top-level `sdkconfig` file after editing this to force regeneration.
+
+CONFIG_IDF_TARGET="esp32c5"
+
+# Flash (module is N8 = 8 MB; if you have N8R8 enable PSRAM below)
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
+
+# Custom partition table with dual OTA slots
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# OTA rollback protection
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=n
+
+# Use native USB-Serial/JTAG (GPIO13/14) as console so `idf.py monitor` works over USB
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# HTTP server tuning (larger URIs and headers for API)
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
+CONFIG_HTTPD_MAX_URI_LEN=512
+
+# Filesystem
+CONFIG_SPIFFS_MAX_PARTITIONS=1
+
+# Wi-Fi — ESP32-C5 dual band; default to 2.4 GHz for phone provisioning AP
+CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=y
+
+# FreeRTOS — bump hz for finer poll cadence
+CONFIG_FREERTOS_HZ=1000
+
+# Logging
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# --- Uncomment if using the N8R8 variant (8 MB flash + 8 MB octal PSRAM) ---
+# CONFIG_SPIRAM=y
+# CONFIG_SPIRAM_MODE_OCT=y
+# CONFIG_SPIRAM_USE_MALLOC=y

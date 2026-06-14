@@ -1,7 +1,5 @@
 #include "fan_control.h"
 
-#include <string.h>
-
 #include "board_pins.h"
 #include "driver/ledc.h"
 #include "driver/pulse_cnt.h"
