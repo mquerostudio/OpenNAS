@@ -5,9 +5,11 @@
 
 #include "esp_app_desc.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "esp_wifi.h"
 #include "fan_control.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -169,6 +171,13 @@ static esp_err_t h_status_get(httpd_req_t *req)
                       ",\"ip\":\"" IPSTR "\"", IP2STR(&ip));
     }
 
+    uint8_t mac[6] = { 0 };
+    if (esp_wifi_get_mac(WIFI_IF_STA, mac) == ESP_OK) {
+        n += snprintf(buf + n, sizeof(buf) - n,
+                      ",\"mac\":\"%02x:%02x:%02x:%02x:%02x:%02x\"",
+                      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    }
+
     n += snprintf(buf + n, sizeof(buf) - n, "}");
 
     httpd_resp_set_type(req, "application/json");
@@ -317,6 +326,58 @@ static esp_err_t h_set_token_post(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* ---------------- POST /api/reboot ----------------
+ * Reinicia el ESP. Autenticado. */
+static esp_err_t h_reboot_post(httpd_req_t *req)
+{
+    if (!http_auth_ok(req)) {
+        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "missing/invalid token");
+        return ESP_FAIL;
+    }
+    httpd_resp_sendstr(req, "ok, rebooting\n");
+    ESP_LOGW(TAG, "reboot requested via /api/reboot");
+    vTaskDelay(pdMS_TO_TICKS(200));
+    esp_restart();
+    return ESP_OK;
+}
+
+/* ---------------- POST /api/set_wifi ----------------
+ * Body {"ssid":"..","pass":".."}. Guarda credenciales y reinicia para conectar
+ * a la nueva red. Autenticado. pass puede ir vacío (red abierta). */
+static esp_err_t h_set_wifi_post(httpd_req_t *req)
+{
+    if (!http_auth_ok(req)) {
+        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "missing/invalid token");
+        return ESP_FAIL;
+    }
+    char body[256];
+    int received = 0;
+    while (received < (int)sizeof(body) - 1) {
+        int r = httpd_req_recv(req, body + received, sizeof(body) - 1 - received);
+        if (r <= 0) { if (r == HTTPD_SOCK_ERR_TIMEOUT) continue; break; }
+        received += r;
+    }
+    body[received] = '\0';
+
+    char ssid[33], pass[65];
+    if (!json_get_str(body, "ssid", ssid, sizeof(ssid)) || ssid[0] == '\0') {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing \"ssid\"");
+        return ESP_FAIL;
+    }
+    if (!json_get_str(body, "pass", pass, sizeof(pass))) pass[0] = '\0';
+
+    esp_err_t err = net_mgr_save_creds(ssid, pass);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+    httpd_resp_sendstr(req, "ok, reconnecting to new network\n");
+    ESP_LOGW(TAG, "wifi creds updated via /api/set_wifi, rebooting");
+    vTaskDelay(pdMS_TO_TICKS(300));
+    esp_restart();
+    return ESP_OK;
+}
+
 /* ---------------- POST /api/reset_wifi ---------------- */
 
 static esp_err_t h_reset_wifi_post(httpd_req_t *req)
@@ -361,11 +422,19 @@ esp_err_t http_server_register_api(httpd_handle_t handle)
     static const httpd_uri_t u_set_token = {
         .uri = "/api/set_token", .method = HTTP_POST, .handler = h_set_token_post,
     };
+    static const httpd_uri_t u_reboot = {
+        .uri = "/api/reboot", .method = HTTP_POST, .handler = h_reboot_post,
+    };
+    static const httpd_uri_t u_set_wifi = {
+        .uri = "/api/set_wifi", .method = HTTP_POST, .handler = h_set_wifi_post,
+    };
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_root));
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_favicon));
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_status));
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_fan));
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_reset));
     ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_set_token));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_reboot));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(handle, &u_set_wifi));
     return ESP_OK;
 }
